@@ -1,26 +1,28 @@
 # 🍽️ KitchenGuard
 
-A web-based application that helps restaurants track inventory, predict orders with AI, and detect unusual usage to reduce losses.
+A **microservices-based** web application that helps restaurants track inventory, predict orders with AI, and detect unusual usage to reduce losses.
 
-## Project Structure
+## 🏗️ Microservices Architecture
 
 ```
 kitchenguard/
-├── backend/ (Flask/FastAPI code)
-│   ├── app.py
-│   ├── models.py
-│   ├── database.db
-│   └── requirements.txt
-├── frontend/ (React code)
-│   ├── src/
-│   │   ├── App.js
-│   │   ├── index.js
-│   │   └── index.css
-│   ├── public/
-│   │   └── index.html
-│   └── package.json
-└── README.md
+├── microservices/
+│   ├── api-gateway/         # Entry point, routing, auth
+│   ├── inventory-service/   # Product & stock management
+│   ├── notification-service/# Alerts & messaging
+│   └── analytics-service/   # Data analysis & reporting
+├── frontend/                # React web application
+├── docker-compose.yml       # Container orchestration
+├── start-microservices.sh   # Development startup script
+└── stop-services.sh         # Service shutdown script
 ```
+
+### 🚀 **Service Architecture**
+- **API Gateway** (Port 8000): Routes requests, handles auth, rate limiting
+- **Inventory Service** (Port 8001): CRUD operations for products and stock
+- **Notification Service** (Port 8005): Alerts, messaging, and notifications
+- **Analytics Service** (Port 8006): Data analysis, reporting, dashboards
+- **Frontend** (Port 3000): React UI consuming microservices via API Gateway
 
 ## Features
 
@@ -40,84 +42,118 @@ kitchenguard/
 - Alert system for potential losses or theft
 - Analytics dashboard for usage insights
 
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
 - Python 3.8+
 - Node.js 16+
 - npm or yarn
 
-### Backend Setup
+### Quick Start (Recommended)
 
-1. Navigate to the backend directory:
+1. **Start All Microservices:**
    ```bash
-   cd backend
+   ./start-microservices.sh
    ```
 
-2. Create a virtual environment:
+2. **Access the Application:**
+   - Frontend: http://localhost:3000
+   - API Gateway: http://localhost:8000
+
+3. **Stop All Services:**
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ./stop-services.sh
    ```
 
-3. Install dependencies:
+### Manual Setup
+
+If you prefer to start services individually:
+
+1. **Start Inventory Service:**
    ```bash
+   cd microservices/inventory-service
+   python -m venv venv && source venv/bin/activate
    pip install -r requirements.txt
+   python app.py  # Runs on port 8001
    ```
 
-4. Run the Flask application:
+2. **Start Notification Service:**
    ```bash
-   python app.py
+   cd microservices/notification-service
+   python -m venv venv && source venv/bin/activate
+   pip install -r requirements.txt
+   python app.py  # Runs on port 8005
    ```
 
-The backend will be available at `http://localhost:5000`
+3. **Start Analytics Service:**
+   ```bash
+   cd microservices/analytics-service
+   python -m venv venv && source venv/bin/activate
+   pip install -r requirements.txt
+   python app.py  # Runs on port 8006
+   ```
 
-### Frontend Setup
+4. **Start API Gateway:**
+   ```bash
+   cd microservices/api-gateway
+   python -m venv venv && source venv/bin/activate
+   pip install -r requirements.txt
+   python app.py  # Runs on port 8000
+   ```
 
-1. Navigate to the frontend directory:
+5. **Start Frontend:**
    ```bash
    cd frontend
-   ```
-
-2. Install dependencies:
-   ```bash
    npm install
+   npm start  # Runs on port 3000
    ```
 
-3. Start the React development server:
-   ```bash
-   npm start
-   ```
+## 🔌 API Endpoints
 
-The frontend will be available at `http://localhost:3000`
-
-## API Endpoints
-
-### Inventory Management
-- `GET /inventory` - List all products
-- `POST /inventory` - Add new product
-- `PUT /inventory/{id}` - Update product
-- `DELETE /inventory/{id}` - Delete product
-- `GET /health` - Health check
-
-### Example API Usage
-
-**Add a new product:**
+### Authentication
+All API requests require an API key header:
 ```bash
-curl -X POST http://localhost:5000/inventory \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Tomatoes",
-    "category": "Produce",
-    "current_stock": 50,
-    "unit_cost": 2.99,
-    "supplier": "Fresh Farm Co"
-  }'
+-H "X-API-Key: kitchenguard-api-key"
 ```
+
+### Inventory Management (via API Gateway)
+- `GET /api/inventory` - List all products
+- `POST /api/inventory` - Add new product
+- `PUT /api/inventory/{id}` - Update product
+- `DELETE /api/inventory/{id}` - Delete product
+- `GET /api/inventory/low-stock` - Get low stock items
+
+### Service Health Checks
+- `GET /health` - API Gateway health
+- Direct service health: ports 8001, 8005, 8006
+
+### 🛠️ Example API Usage
 
 **Get all inventory:**
 ```bash
-curl http://localhost:5000/inventory
+curl -H "X-API-Key: kitchenguard-api-key" \
+  http://localhost:8000/api/inventory
+```
+
+**Add a new product:**
+```bash
+curl -X POST \
+  -H "X-API-Key: kitchenguard-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Tomatoes",
+    "category": "Produce", 
+    "current_stock": 50,
+    "unit_cost": 2.99,
+    "supplier": "Fresh Farm Co"
+  }' \
+  http://localhost:8000/api/inventory
+```
+
+**Get analytics dashboard:**
+```bash
+curl -H "X-API-Key: kitchenguard-api-key" \
+  http://localhost:8000/api/analytics/dashboard
 ```
 
 ## Database Schema
@@ -134,14 +170,31 @@ CREATE TABLE products (
 );
 ```
 
-## Technology Stack
+## 🛠️ Technology Stack
 
-- **Backend**: Flask (Python)
-- **Frontend**: React (JavaScript)
-- **Database**: SQLite
+### **Microservices Architecture**
+- **API Gateway**: Flask + Request Routing + Authentication
+- **Service Discovery**: Automatic service registration
+- **Inter-Service Communication**: REST APIs + Event Publishing
+- **Load Balancing**: Round-robin (extensible to multiple instances)
+
+### **Backend Services**
+- **Languages**: Python (Flask)
+- **Database**: SQLite (per service) + PostgreSQL (production ready)
+- **Caching**: In-memory + Redis (production ready)
+- **Message Queue**: Event-based communication
+
+### **Frontend**
+- **Framework**: React (JavaScript)
+- **HTTP Client**: Axios with API Gateway integration
 - **Styling**: CSS3
-- **HTTP Client**: Axios
-- **CORS**: Flask-CORS
+- **Authentication**: API Key based
+
+### **DevOps & Deployment**
+- **Containerization**: Docker + Docker Compose
+- **Orchestration**: Docker Compose (Kubernetes ready)
+- **Monitoring**: Health checks + Service registry
+- **Development**: Hot reload + Automated startup scripts
 
 ## Development Roadmap
 

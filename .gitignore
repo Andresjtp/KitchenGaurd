@@ -60,3 +60,6 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Legacy backup
+backend-legacy-backup/

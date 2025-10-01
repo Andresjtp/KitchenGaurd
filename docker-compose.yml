@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # API Gateway - Entry point for all requests
+  api-gateway:
+    build:
+      context: ./microservices/api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - FLASK_ENV=development
+    volumes:
+      - ./microservices/api-gateway:/app
+    depends_on:
+      - inventory-service
+      - notification-service
+      - analytics-service
+    networks:
+      - kitchenguard-network
+
+  # Inventory Service - Manages products and stock
+  inventory-service:
+    build:
+      context: ./microservices/inventory-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - FLASK_ENV=development
+    volumes:
+      - ./microservices/inventory-service:/app
+      - inventory-data:/app/data
+    networks:
+      - kitchenguard-network
+
+  # Notification Service - Handles alerts and messaging
+  notification-service:
+    build:
+      context: ./microservices/notification-service
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      - FLASK_ENV=development
+    volumes:
+      - ./microservices/notification-service:/app
+    networks:
+      - kitchenguard-network
+
+  # Analytics Service - Data analysis and reporting
+  analytics-service:
+    build:
+      context: ./microservices/analytics-service
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      - FLASK_ENV=development
+    volumes:
+      - ./microservices/analytics-service:/app
+    networks:
+      - kitchenguard-network
+
+  # Frontend - React application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - api-gateway
+    networks:
+      - kitchenguard-network
+
+  # Redis - For caching and message queuing
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - kitchenguard-network
+
+  # PostgreSQL - For persistent data storage
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=kitchenguard
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=password123
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - kitchenguard-network
+
+networks:
+  kitchenguard-network:
+    driver: bridge
+
+volumes:
+  inventory-data:
+  redis-data:
+  postgres-data:

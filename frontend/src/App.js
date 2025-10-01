@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5001';
+const API_BASE_URL = 'http://localhost:8000/api';
+const API_KEY = 'kitchenguard-api-key';
 
 function App() {
   const [products, setProducts] = useState([]);
@@ -16,15 +17,23 @@ function App() {
     supplier: ''
   });
 
+  // Configure axios defaults
+  const axiosConfig = {
+    headers: {
+      'X-API-Key': API_KEY,
+      'Content-Type': 'application/json'
+    }
+  };
+
   // Fetch inventory data
   const fetchInventory = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/inventory`);
+      const response = await axios.get(`${API_BASE_URL}/inventory`, axiosConfig);
       setProducts(response.data);
       setError('');
     } catch (err) {
-      setError('Failed to fetch inventory data. Make sure the backend is running.');
+      setError('Failed to fetch inventory data. Make sure the microservices are running.');
       console.error('Error fetching inventory:', err);
     } finally {
       setLoading(false);
@@ -48,7 +57,7 @@ function App() {
   const handleAddProduct = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API_BASE_URL}/inventory`, formData);
+      await axios.post(`${API_BASE_URL}/inventory`, formData, axiosConfig);
       setFormData({
         name: '',
         category: '',
@@ -68,7 +77,7 @@ function App() {
   const handleDeleteProduct = async (productId) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
-        await axios.delete(`${API_BASE_URL}/inventory/${productId}`);
+        await axios.delete(`${API_BASE_URL}/inventory/${productId}`, axiosConfig);
         fetchInventory();
       } catch (err) {
         setError('Failed to delete product');
@@ -83,7 +92,7 @@ function App() {
     try {
       await axios.put(`${API_BASE_URL}/inventory/${productId}`, {
         current_stock: newStock
-      });
+      }, axiosConfig);
       fetchInventory();
     } catch (err) {
       setError('Failed to update stock');
