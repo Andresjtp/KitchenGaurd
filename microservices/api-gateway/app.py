@@ -167,13 +167,28 @@ def list_services():
     return jsonify({"services": services, "health": service_health})
 
 
+# Authentication routes (proxy to auth service)
+@app.route("/api/register", methods=["POST"])
+@app.route("/api/login", methods=["POST"])
+@app.route("/api/reset-password", methods=["POST"])
+@rate_limit()
+def proxy_auth_service():
+    """Proxy authentication requests to auth service"""
+    # Remove /api prefix for the auth service
+    auth_path = request.path.replace("/api", "")
+    return proxy_to_service("auth-service", auth_path)
+
+
 # Route requests to inventory service
 @app.route("/api/inventory", methods=["GET", "POST"])
 @app.route("/api/inventory/<int:product_id>", methods=["GET", "PUT", "DELETE"])
 @app.route("/api/inventory/low-stock", methods=["GET"])
+@app.route("/api/inventory/user/<int:user_id>", methods=["GET"])
+@app.route("/api/inventory/kitchen/<int:user_id>", methods=["GET"])
+@app.route("/api/inventory/bar/<int:user_id>", methods=["GET"])
 @rate_limit()
 @authenticate()
-def proxy_inventory_service(product_id=None):
+def proxy_inventory_service(product_id=None, user_id=None):
     """Proxy requests to inventory service"""
     return proxy_to_service("inventory-service", request.path.replace("/api", ""))
 

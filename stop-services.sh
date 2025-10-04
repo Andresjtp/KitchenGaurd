@@ -46,6 +46,7 @@ echo -e "${YELLOW}Stopping services by PID files...${NC}"
 
 # Stop services by PID files
 stop_service_by_pid "API Gateway" "./microservices/api-gateway/api-gateway.pid"
+stop_service_by_pid "Auth Service" "./microservices/auth-service/auth-service.pid"
 stop_service_by_pid "Inventory Service" "./microservices/inventory-service/inventory-service.pid"
 stop_service_by_pid "Notification Service" "./microservices/notification-service/notification-service.pid"
 stop_service_by_pid "Analytics Service" "./microservices/analytics-service/analytics-service.pid"
@@ -56,6 +57,7 @@ echo -e "${YELLOW}Stopping services by ports (fallback)...${NC}"
 
 # Stop services by ports (fallback)
 stop_service_by_port "API Gateway" 8000
+stop_service_by_port "Auth Service" 8007
 stop_service_by_port "Inventory Service" 8001
 stop_service_by_port "Notification Service" 8005
 stop_service_by_port "Analytics Service" 8006

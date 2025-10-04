@@ -79,19 +79,22 @@ echo -e "${BLUE}Checking prerequisites...${NC}"
 # Start services in dependency order
 echo -e "${BLUE}Starting backend microservices...${NC}"
 
-# 1. Start Inventory Service (core service)
+# 1. Start Authentication Service (user management)
+start_service "auth-service" "./microservices/auth-service" 8007
+
+# 2. Start Inventory Service (core service)
 start_service "inventory-service" "./microservices/inventory-service" 8001
 
-# 2. Start Notification Service
+# 3. Start Notification Service
 start_service "notification-service" "./microservices/notification-service" 8005
 
-# 3. Start Analytics Service
+# 4. Start Analytics Service
 start_service "analytics-service" "./microservices/analytics-service" 8006
 
-# 4. Start API Gateway (depends on other services)
+# 5. Start API Gateway (depends on other services)
 start_service "api-gateway" "./microservices/api-gateway" 8000
 
-# 5. Start Frontend
+# 6. Start Frontend
 echo -e "${BLUE}Starting frontend...${NC}"
 if check_port 3000; then
     cd frontend
@@ -118,13 +121,15 @@ echo -e "${GREEN}🎉 KitchenGuard Microservices are starting up!${NC}"
 echo ""
 echo -e "${BLUE}Services:${NC}"
 echo "  🌐 API Gateway:     http://localhost:8000"
-echo "  📦 Inventory:       http://localhost:8001"
+echo "  � Authentication:  http://localhost:8007"
+echo "  �📦 Inventory:       http://localhost:8001"
 echo "  🔔 Notifications:   http://localhost:8005"
 echo "  📊 Analytics:       http://localhost:8006"
 echo "  🖥️  Frontend:        http://localhost:3000"
 echo ""
 echo -e "${BLUE}Health Checks:${NC}"
 echo "  curl http://localhost:8000/health"
+echo "  curl http://localhost:8007/health"
 echo "  curl http://localhost:8001/health"
 echo "  curl http://localhost:8005/health"
 echo "  curl http://localhost:8006/health"

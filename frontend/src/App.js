@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { AuthWrapper } from './components/Auth';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 const API_KEY = 'kitchenguard-api-key';
 
 function App() {
+  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
   const [products, setProducts] = useState([]);
+  const [inventoryData, setInventoryData] = useState({ kitchen: [], bar: [], combined: [] });
+  const [currentView, setCurrentView] = useState('combined'); // 'kitchen', 'bar', or 'combined'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -17,6 +23,43 @@ function App() {
     supplier: ''
   });
 
+  // Check for existing authentication on app load
+  useEffect(() => {
+    const checkAuthStatus = () => {
+      const storedUser = localStorage.getItem('kitchenguard_user');
+      const storedToken = localStorage.getItem('kitchenguard_token');
+      
+      if (storedUser && storedToken) {
+        try {
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+          setIsAuthenticated(true);
+        } catch (error) {
+          console.error('Error parsing stored user data:', error);
+          localStorage.removeItem('kitchenguard_user');
+          localStorage.removeItem('kitchenguard_token');
+        }
+      }
+      setAuthLoading(false);
+    };
+
+    checkAuthStatus();
+  }, []);
+
+  // Authentication handlers
+  const handleAuthSuccess = (userData) => {
+    setUser(userData);
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('kitchenguard_user');
+    localStorage.removeItem('kitchenguard_token');
+    setUser(null);
+    setIsAuthenticated(false);
+    setProducts([]);
+  };
+
   // Configure axios defaults
   const axiosConfig = {
     headers: {
@@ -27,22 +70,61 @@ function App() {
 
   // Fetch inventory data
   const fetchInventory = async () => {
+    if (!user?.id) {
+      setError('User ID not available');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/inventory`, axiosConfig);
-      setProducts(response.data);
+      const response = await axios.get(`${API_BASE_URL}/inventory/user/${user.id}`, axiosConfig);
+      
+      if (response.data.combined || response.data.kitchen || response.data.bar) {
+        setInventoryData(response.data);
+        setProducts(response.data.combined || []);
+      } else {
+        // Handle case where response is just an array
+        setProducts(response.data);
+        setInventoryData({ 
+          kitchen: response.data.filter(item => item.type === 'kitchen') || [],
+          bar: response.data.filter(item => item.type === 'bar') || [],
+          combined: response.data 
+        });
+      }
       setError('');
     } catch (err) {
       setError('Failed to fetch inventory data. Make sure the microservices are running.');
       console.error('Error fetching inventory:', err);
+      setProducts([]);
+      setInventoryData({ kitchen: [], bar: [], combined: [] });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchInventory();
-  }, []);
+    if (isAuthenticated && user?.id) {
+      fetchInventory();
+    }
+  }, [isAuthenticated, user?.id]);
+
+  // Handle inventory view switching
+  const handleViewChange = (view) => {
+    setCurrentView(view);
+    switch(view) {
+      case 'kitchen':
+        setProducts(inventoryData.kitchen || []);
+        break;
+      case 'bar':
+        setProducts(inventoryData.bar || []);
+        break;
+      case 'combined':
+      default:
+        setProducts(inventoryData.combined || []);
+        break;
+    }
+  };
 
   // Handle form input changes
   const handleInputChange = (e) => {
@@ -100,11 +182,41 @@ function App() {
     }
   };
 
+  // Show loading screen while checking authentication
+  if (authLoading) {
+    return (
+      <div className="App">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Loading KitchenGuard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show authentication screen if not logged in
+  if (!isAuthenticated) {
+    return <AuthWrapper onAuthSuccess={handleAuthSuccess} />;
+  }
+
   return (
     <div className="App">
       <div className="header">
         <h1>🍽️ KitchenGuard</h1>
         <p>Restaurant Inventory Management System</p>
+        <div className="user-info">
+          <div className="user-details">
+            <span className="user-name">Welcome, {user?.fullName}</span>
+            <span className="user-restaurant">{user?.restaurantName} • {user?.userPosition}</span>
+          </div>
+          <button 
+            className="btn btn-logout"
+            onClick={handleLogout}
+            title="Logout"
+          >
+            Logout
+          </button>
+        </div>
       </div>
 
       <div className="container">
@@ -198,9 +310,37 @@ function App() {
         )}
 
         <div className="inventory-table">
-          <h3 style={{ padding: '20px', margin: '0', backgroundColor: '#34495e', color: 'white' }}>
-            Current Inventory
-          </h3>
+          <div style={{ backgroundColor: '#34495e', color: 'white', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ margin: '0' }}>
+              Current Inventory
+              {currentView === 'kitchen' && ' - Kitchen'}
+              {currentView === 'bar' && ' - Bar'}
+              {currentView === 'combined' && ' - All Items'}
+            </h3>
+            <div className="inventory-tabs">
+              <button 
+                className={`btn ${currentView === 'combined' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => handleViewChange('combined')}
+                style={{ marginRight: '5px', fontSize: '14px', padding: '6px 12px' }}
+              >
+                All ({inventoryData.combined?.length || 0})
+              </button>
+              <button 
+                className={`btn ${currentView === 'kitchen' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => handleViewChange('kitchen')}
+                style={{ marginRight: '5px', fontSize: '14px', padding: '6px 12px' }}
+              >
+                Kitchen ({inventoryData.kitchen?.length || 0})
+              </button>
+              <button 
+                className={`btn ${currentView === 'bar' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => handleViewChange('bar')}
+                style={{ fontSize: '14px', padding: '6px 12px' }}
+              >
+                Bar ({inventoryData.bar?.length || 0})
+              </button>
+            </div>
+          </div>
           
           {loading ? (
             <div className="loading">Loading inventory...</div>
@@ -212,6 +352,7 @@ function App() {
                 <tr>
                   <th>ID</th>
                   <th>Product Name</th>
+                  <th>Type</th>
                   <th>Category</th>
                   <th>Current Stock</th>
                   <th>Unit Cost</th>
@@ -225,6 +366,17 @@ function App() {
                   <tr key={product.id}>
                     <td>{product.id}</td>
                     <td>{product.name}</td>
+                    <td>
+                      <span style={{ 
+                        padding: '4px 8px', 
+                        borderRadius: '4px', 
+                        fontSize: '12px',
+                        backgroundColor: product.type === 'kitchen' ? '#27ae60' : '#8e44ad',
+                        color: 'white'
+                      }}>
+                        {product.type === 'kitchen' ? '🍽️ Kitchen' : '🍸 Bar'}
+                      </span>
+                    </td>
                     <td>{product.category}</td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
