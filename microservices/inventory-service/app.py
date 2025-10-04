@@ -26,6 +26,7 @@ def init_db():
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
 
+    # Main products table (for general inventory)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,6 +35,40 @@ def init_db():
             current_stock INTEGER DEFAULT 0,
             unit_cost REAL,
             supplier TEXT,
+            unit TEXT DEFAULT 'each',
+            user_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Kitchen produce table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS kitchen_produce (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            category TEXT,
+            supplier TEXT,
+            unit_cost REAL,
+            unit TEXT DEFAULT 'each',
+            current_stock INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Bar supplies table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS bar_supplies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            category TEXT,
+            supplier TEXT,
+            unit_cost REAL,
+            unit TEXT DEFAULT 'each',
+            current_stock INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -274,6 +309,209 @@ def get_low_stock():
 
         conn.close()
         return jsonify(low_stock_products)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/inventory/kitchen", methods=["POST"])
+def import_kitchen_inventory():
+    """Import kitchen produce list for a user"""
+    try:
+        data = request.get_json()
+        
+        if not data.get('user_id') or not data.get('items'):
+            return jsonify({"error": "user_id and items are required"}), 400
+        
+        user_id = data['user_id']
+        items = data['items']
+        
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        # Clear existing kitchen items for this user
+        cursor.execute("DELETE FROM kitchen_produce WHERE user_id = ?", (user_id,))
+        
+        # Insert new items
+        for item in items:
+            cursor.execute("""
+                INSERT INTO kitchen_produce (user_id, name, category, supplier, unit_cost, unit)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                user_id,
+                item.get('name', ''),
+                item.get('category', 'General'),
+                item.get('supplier', ''),
+                item.get('unitCost', 0),
+                item.get('unit', 'each')
+            ))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"message": f"Successfully imported {len(items)} kitchen items"}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/inventory/bar", methods=["POST"])
+def import_bar_inventory():
+    """Import bar supplies list for a user"""
+    try:
+        data = request.get_json()
+        
+        if not data.get('user_id') or not data.get('items'):
+            return jsonify({"error": "user_id and items are required"}), 400
+        
+        user_id = data['user_id']
+        items = data['items']
+        
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        # Clear existing bar items for this user
+        cursor.execute("DELETE FROM bar_supplies WHERE user_id = ?", (user_id,))
+        
+        # Insert new items
+        for item in items:
+            cursor.execute("""
+                INSERT INTO bar_supplies (user_id, name, category, supplier, unit_cost, unit)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                user_id,
+                item.get('name', ''),
+                item.get('category', 'General'),
+                item.get('supplier', ''),
+                item.get('unitCost', 0),
+                item.get('unit', 'each')
+            ))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"message": f"Successfully imported {len(items)} bar items"}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/inventory/kitchen/<int:user_id>", methods=["GET"])
+def get_kitchen_inventory(user_id):
+    """Get kitchen produce for a specific user"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM kitchen_produce WHERE user_id = ? ORDER BY name", (user_id,))
+        items = cursor.fetchall()
+        
+        kitchen_items = []
+        for item in items:
+            kitchen_items.append({
+                "id": item[0],
+                "user_id": item[1],
+                "name": item[2],
+                "category": item[3],
+                "supplier": item[4],
+                "unit_cost": item[5],
+                "unit": item[6],
+                "current_stock": item[7]
+            })
+        
+        conn.close()
+        return jsonify(kitchen_items)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/inventory/bar/<int:user_id>", methods=["GET"])
+def get_bar_inventory(user_id):
+    """Get bar supplies for a specific user"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM bar_supplies WHERE user_id = ? ORDER BY name", (user_id,))
+        items = cursor.fetchall()
+        
+        bar_items = []
+        for item in items:
+            bar_items.append({
+                "id": item[0],
+                "user_id": item[1],
+                "name": item[2],
+                "category": item[3],
+                "supplier": item[4],
+                "unit_cost": item[5],
+                "unit": item[6],
+                "current_stock": item[7]
+            })
+        
+        conn.close()
+        return jsonify(bar_items)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/inventory/user/<int:user_id>", methods=["GET"])
+def get_user_inventory(user_id):
+    """Get combined inventory for a specific user (kitchen + bar)"""
+    try:
+        inventory_type = request.args.get('type', 'all')  # 'kitchen', 'bar', or 'all'
+        
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        result = {"kitchen": [], "bar": [], "combined": []}
+        
+        # Get kitchen inventory
+        if inventory_type in ['kitchen', 'all']:
+            cursor.execute("SELECT * FROM kitchen_produce WHERE user_id = ? ORDER BY name", (user_id,))
+            kitchen_items = cursor.fetchall()
+            
+            for item in kitchen_items:
+                kitchen_item = {
+                    "id": item[0],
+                    "user_id": item[1],
+                    "name": item[2],
+                    "category": item[3],
+                    "supplier": item[4],
+                    "unit_cost": item[5],
+                    "unit": item[6],
+                    "current_stock": item[7],
+                    "type": "kitchen"
+                }
+                result["kitchen"].append(kitchen_item)
+                result["combined"].append(kitchen_item)
+        
+        # Get bar inventory
+        if inventory_type in ['bar', 'all']:
+            cursor.execute("SELECT * FROM bar_supplies WHERE user_id = ? ORDER BY name", (user_id,))
+            bar_items = cursor.fetchall()
+            
+            for item in bar_items:
+                bar_item = {
+                    "id": item[0],
+                    "user_id": item[1],
+                    "name": item[2],
+                    "category": item[3],
+                    "supplier": item[4],
+                    "unit_cost": item[5],
+                    "unit": item[6],
+                    "current_stock": item[7],
+                    "type": "bar"
+                }
+                result["bar"].append(bar_item)
+                result["combined"].append(bar_item)
+        
+        conn.close()
+        
+        # Return based on requested type
+        if inventory_type == 'kitchen':
+            return jsonify(result["kitchen"])
+        elif inventory_type == 'bar':
+            return jsonify(result["bar"])
+        else:
+            return jsonify(result)
+            
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
