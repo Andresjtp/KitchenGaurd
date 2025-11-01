@@ -1,0 +1,106 @@
+version: '3.8'
+
+# Production-ready Docker Compose for ECS Fargate deployment testing
+# This file uses the same configuration that will be deployed to AWS
+
+services:
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./microservices/api-gateway
+      dockerfile: Dockerfile
+    container_name: kg-api-gateway-prod
+    ports:
+      - "8000:8000"
+    environment:
+      - GATEWAY_PORT=8000
+      - AUTH_SERVICE_URL=http://auth-service:8007
+      - INVENTORY_SERVICE_URL=http://inventory-service:8001
+      - RATE_LIMIT_PER_MINUTE=100
+      - CORS_ORIGINS=*
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+    networks:
+      - kitchenguard-network
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ./microservices/auth-service
+      dockerfile: Dockerfile
+    container_name: kg-auth-service-prod
+    ports:
+      - "8007:8007"
+    environment:
+      - AUTH_PORT=8007
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-key-change-in-production}
+      - JWT_EXPIRATION_HOURS=24
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${AUTH_DB_NAME:-kitchenguard_auth}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - API_GATEWAY_URL=http://api-gateway:8000
+      - SERVICE_NAME=auth-service
+    networks:
+      - kitchenguard-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import requests; requests.get(\"http://localhost:8007/health\", timeout=2)' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Inventory Service
+  inventory-service:
+    build:
+      context: ./microservices/inventory-service
+      dockerfile: Dockerfile
+    container_name: kg-inventory-service-prod
+    ports:
+      - "8001:8001"
+    environment:
+      - INVENTORY_PORT=8001
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${INVENTORY_DB_NAME:-kitchenguard_inventory}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - API_GATEWAY_URL=http://api-gateway:8000
+      - SERVICE_NAME=inventory-service
+    networks:
+      - kitchenguard-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import requests; requests.get(\"http://localhost:8001/health\", timeout=2)' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  kitchenguard-network:
+    driver: bridge
+
+# Note: In AWS ECS Fargate, services will use AWS CloudWatch Logs instead of local logging
+# Network will be AWS VPC with Service Discovery for service-to-service communication

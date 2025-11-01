@@ -1,0 +1,25 @@
+# Terraform Variables - Copy this to terraform.tfvars and fill in your values
+
+# AWS Configuration
+aws_region = "us-east-2"
+environment = "prod"
+
+# RDS Database Configuration
+rds_endpoint = "kitchenguard-db.cxike2u26m31.us-east-2.rds.amazonaws.com"
+db_user      = "KG_Admin"
+db_password  = "your-db-password-here"  # REQUIRED: Update with your actual RDS password
+
+# JWT Secret
+jwt_secret_key = "your-super-secret-jwt-key-change-this-in-production"  # REQUIRED: Generate a strong random string
+
+# Container Configuration
+container_cpu    = 256
+container_memory = 512
+
+# Service Scaling
+desired_count_auth      = 2
+desired_count_inventory = 2
+desired_count_gateway   = 2
+
+# Image Tag (default: latest)
+ecr_image_tag = "latest"

@@ -1,0 +1,67 @@
+{
+  "family": "kitchenguard-api-gateway",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "api-gateway",
+      "image": "YOUR_ACCOUNT_ID.dkr.ecr.us-east-2.amazonaws.com/kitchenguard-gateway:latest",
+      "cpu": 256,
+      "memory": 512,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "hostPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "GATEWAY_PORT",
+          "value": "8000"
+        },
+        {
+          "name": "AUTH_SERVICE_URL",
+          "value": "http://auth-service.kitchenguard-internal:8007"
+        },
+        {
+          "name": "INVENTORY_SERVICE_URL",
+          "value": "http://inventory-service.kitchenguard-internal:8001"
+        },
+        {
+          "name": "RATE_LIMIT_PER_MINUTE",
+          "value": "100"
+        },
+        {
+          "name": "CORS_ORIGINS",
+          "value": "*"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/kitchenguard-api-gateway",
+          "awslogs-region": "us-east-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "python -c 'import requests; requests.get(\"http://localhost:8000/health\", timeout=2)' || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}
